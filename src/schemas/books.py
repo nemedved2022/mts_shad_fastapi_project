@@ -48,6 +48,6 @@ class ReturnedSellerBook(BaseModel):
 
 # Класс для возврата массива объектов "Книга"
 class ReturnedAllBooks(BaseModel):
-    books: list[ReturnedSellerBook]
+    books: list[ReturnedBook]
 
 
