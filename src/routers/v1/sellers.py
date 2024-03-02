@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status, HTTPException
 from icecream import ic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hashlib import sha256
 
 from src.configurations.database import get_async_session
+from src.configurations.settings import settings
 from src.models.sellers import Seller
-from src.schemas import IncomingSeller, ReturnedAllSellers, ReturnedSeller
+from src.models.books import Book
+from src.schemas import (
+    IncomingSeller,
+    ReturnedAllSellers,
+    ReturnedSeller,
+    ReturnedSellerWithBooks,
+    ReturnedBook
+)
 
 sellers_router = APIRouter(tags=["seller"], prefix="/seller")
 
@@ -17,7 +25,7 @@ sellers_router = APIRouter(tags=["seller"], prefix="/seller")
 DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 
 
-SALT = "ljkbnadogw%(@*&()rngrpej0[39a4j2=2@04tuu1q2uutgj"  # TODO: extract to .env and add to settings
+SALT = settings.salt
 
 
 async def get_password_hash(password: str) -> str:
@@ -53,15 +61,57 @@ async def get_all_sellers(session: DBSession):
     return {"sellers": sellers}
 
 
-# Ручка для получения книги по ее ИД
-@sellers_router.get("/{seller_id}", response_model=ReturnedSeller)
-async def get_seller(seller_id: int, session: DBSession):
-    res = await session.get(Seller, seller_id)
-    return res
+# Ручка для получения продавца по его ИД
 
+@sellers_router.get("/{seller_id}", response_model=ReturnedSellerWithBooks)
+async def get_seller(seller_id: int, session: DBSession):
+    if found_seller := await session.get(Seller, seller_id):
+        stmt = select(Book).where(Book.seller_id == seller_id)
+        books_res = await session.execute(stmt)
+        books = books_res.scalars()
+
+        return ReturnedSellerWithBooks(
+            id=found_seller.id,
+            first_name=found_seller.first_name,
+            last_name=found_seller.last_name,
+            email=found_seller.email,
+            books=iter(books),  # FIXME: NO BOOKS
+        )
+
+    return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+
+
+'''@sellers_router.get("/{seller_id}", response_model=ReturnedSellerWithBooks)
+async def get_seller_details(seller_id: int, session: DBSession):
+    try:
+        if found_seller := await session.get(Seller, seller_id):
+            stmt = select(Book).where(Book.seller_id == seller_id)
+            books_res = await session.execute(stmt)
+            books = books_res.scalars().all()
+
+            seller_with_books = ReturnedSellerWithBooks(
+                id=found_seller.id,
+                first_name=found_seller.first_name,
+                last_name=found_seller.last_name,
+                email=found_seller.email,
+                books=books,
+            )
+            # Exclude the password from the response
+            seller_with_books_data = seller_with_books.dict(exclude={"password_hash"})
+
+            return seller_with_books_data
+
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seller not found")
+    except Exception as e:
+        # Log the exception e
+        ic(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
+'''
 
 # Ручка для удаления книги
-@sellers_router.delete("/{seller_id}")  # FIXME: delete all sellers book too
+@sellers_router.delete("/{seller_id}")
 async def delete_seller(seller_id: int, session: DBSession):
     deleted_seller = await session.get(Seller, seller_id)
     ic(deleted_seller)  # Красивая и информативная замена для print. Полезна при отладке.
@@ -72,7 +122,7 @@ async def delete_seller(seller_id: int, session: DBSession):
 
 
 # Ручка для обновления данных о книге
-@sellers_router.put("/{seller_id}", response_model=ReturnedSeller)  # FIXME: remove password from response object
+@sellers_router.put("/{seller_id}", response_model=ReturnedSeller)
 async def update_seller(seller_id: int, new_data: ReturnedSeller, session: DBSession):
     # Оператор "морж", позволяющий одновременно и присвоить значение и проверить его.
     if updated_seller := await session.get(Seller, seller_id):

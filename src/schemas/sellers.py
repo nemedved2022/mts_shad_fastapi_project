@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
+from .books import ReturnedBook
 
-__all__ = ["IncomingSeller", "ReturnedAllSellers", "ReturnedSeller"]
+__all__ = ["IncomingSeller", "ReturnedAllSellers", "ReturnedSeller", "ReturnedSellerWithBooks"]
 
 
 # Базовый класс "Продавца", содержащий поля, которые есть во всех классах-наследниках.
@@ -18,6 +19,11 @@ class IncomingSeller(BaseSeller):
 # Класс, валидирующий исходящие данные. Он уже содержит id
 class ReturnedSeller(BaseSeller):
     id: int
+
+
+class ReturnedSellerWithBooks(ReturnedSeller):
+    id: int
+    books: list[ReturnedBook]
 
 
 # Класс для возврата массива объектов "Продавец"
