@@ -16,7 +16,7 @@ from src.schemas import (
     ReturnedAllSellers,
     ReturnedSeller,
     ReturnedSellerWithBooks,
-    ReturnedBook
+    ReturnedBook, ReturnedSellerBook
 )
 
 sellers_router = APIRouter(tags=["seller"], prefix="/seller")
@@ -68,47 +68,21 @@ async def get_seller(seller_id: int, session: DBSession):
     if found_seller := await session.get(Seller, seller_id):
         stmt = select(Book).where(Book.seller_id == seller_id)
         books_res = await session.execute(stmt)
-        books = books_res.scalars()
+        books = []
+        for book in books_res.scalars().all():
+            books.append(ReturnedSellerBook.model_validate(book))
+        ic(books)
 
         return ReturnedSellerWithBooks(
             id=found_seller.id,
             first_name=found_seller.first_name,
             last_name=found_seller.last_name,
             email=found_seller.email,
-            books=iter(books),  # FIXME: NO BOOKS
+            books=books,
         )
 
     return Response(status_code=status.HTTP_404_NOT_FOUND)
 
-
-
-'''@sellers_router.get("/{seller_id}", response_model=ReturnedSellerWithBooks)
-async def get_seller_details(seller_id: int, session: DBSession):
-    try:
-        if found_seller := await session.get(Seller, seller_id):
-            stmt = select(Book).where(Book.seller_id == seller_id)
-            books_res = await session.execute(stmt)
-            books = books_res.scalars().all()
-
-            seller_with_books = ReturnedSellerWithBooks(
-                id=found_seller.id,
-                first_name=found_seller.first_name,
-                last_name=found_seller.last_name,
-                email=found_seller.email,
-                books=books,
-            )
-            # Exclude the password from the response
-            seller_with_books_data = seller_with_books.dict(exclude={"password_hash"})
-
-            return seller_with_books_data
-
-        else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seller not found")
-    except Exception as e:
-        # Log the exception e
-        ic(e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
-'''
 
 # Ручка для удаления книги
 @sellers_router.delete("/{seller_id}")

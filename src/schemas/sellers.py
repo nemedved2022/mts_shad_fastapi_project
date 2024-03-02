@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from .books import ReturnedBook
+from .books import ReturnedBook, ReturnedSellerBook
 
 __all__ = ["IncomingSeller", "ReturnedAllSellers", "ReturnedSeller", "ReturnedSellerWithBooks"]
 
@@ -21,11 +21,14 @@ class ReturnedSeller(BaseSeller):
     id: int
 
 
-class ReturnedSellerWithBooks(ReturnedSeller):
-    id: int
-    books: list[ReturnedBook]
-
-
 # Класс для возврата массива объектов "Продавец"
 class ReturnedAllSellers(BaseModel):
     sellers: list[ReturnedSeller]
+
+
+class ReturnedSellerWithBooks(ReturnedSeller):
+    books: list[ReturnedSellerBook]
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
